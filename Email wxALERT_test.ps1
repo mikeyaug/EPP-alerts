@@ -6,7 +6,7 @@
 param (
     [string]$recipientEmail, # Changed parameter name for clarity
     [string]$senderEmail = "alerts@escapeplanpartners.com", # <-- IMPORTANT: Change this to your authorized sending email address
-    [string]$subject = "TEST: ⚠️ Weather ALERT from Escape Plan Partners",
+    [string]$subject = "TEST: Weather ALERT from Escape Plan Partners",
     [string]$body = "This is a test of the automated weather alerting system via escapeplanpartners.com. Your sign-up for weather alerts was successful, and you will receive real-time alerts at this address or device during your contract period."
 )
 
