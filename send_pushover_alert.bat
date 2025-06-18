@@ -8,8 +8,6 @@ set "MESSAGE_FILE_PATH=C:\Program Files\WxMesgNet\WxMesg-to-Pushover\alert.txt"
 set "LOG_DIR=C:\Program Files\WxMesgNet\"
 
 :: --- Ensure Log Directory Exists ---
-:: This will create the directory if it doesn't exist.
-:: It's crucial for the log file to be written correctly.
 if not exist "%LOG_DIR%" (
     echo INFO: Creating log directory "%LOG_DIR%"
     mkdir "%LOG_DIR%"
@@ -19,17 +17,44 @@ if not exist "%LOG_DIR%" (
     )
 )
 
-:: --- Get Today's Date for Log File (YYYY-MM-DD format using WMIC) ---
-:: This method is reliable and locale-independent.
-for /f "tokens=2 delims==" %%a in ('wmic path win32_localtime get year /value') do set "YYYY=%%a"
-for /f "tokens=2 delims==" %%a in ('wmic path win32_localtime get month /value') do set "MM=00%%a"
-for /f "tokens=2 delims==" %%a in ('wmic path win32_localtime get day /value') do set "DD=00%%a"
+:: --- Get Today's Date for Log File (YYYY-MM-DD format using WMIC - More Robust) ---
+:: We pipe WMIC output through findstr to filter out blank lines and ensure only "Key=Value" lines are processed.
+:: Then, we use if/else for padding instead of substring slicing, which is safer if the variable is not set.
 
-:: Format Month and Day with leading zeros if necessary
-set "MM=%MM:~-2%"
-set "DD=%DD:~-2%"
+:: Get Year
+set "YYYY="
+for /f "tokens=2 delims==" %%a in ('wmic path win32_localtime get year /value ^| findstr "="') do set "YYYY=%%a"
+if not defined YYYY (
+    set "YYYY=UNKNOWN"
+    echo ERROR: Could not determine Year from WMIC. >> "%LOG_DIR%_error.log"
+)
 
+:: Get Month
+set "MM_RAW="
+for /f "tokens=2 delims==" %%a in ('wmic path win32_localtime get month /value ^| findstr "="') do set "MM_RAW=%%a"
+if not defined MM_RAW (
+    set "MM=UN"
+    echo ERROR: Could not determine Month from WMIC. >> "%LOG_DIR%_error.log"
+) else (
+    if "%MM_RAW%" LSS "10" (set "MM=0%MM_RAW%") else (set "MM=%MM_RAW%")
+)
+
+:: Get Day
+set "DD_RAW="
+for /f "tokens=2 delims==" %%a in ('wmic path win32_localtime get day /value ^| findstr "="') do set "DD_RAW=%%a"
+if not defined DD_RAW (
+    set "DD=KN"
+    echo ERROR: Could not determine Day from WMIC. >> "%LOG_DIR%_error.log"
+) else (
+    if "%DD_RAW%" LSS "10" (set "DD=0%DD_RAW%") else (set "DD=%DD_RAW%")
+)
+
+:: Assemble Current Date (fallback if parts are unknown)
 set "CURRENT_DATE=%YYYY%-%MM%-%DD%"
+if "%CURRENT_DATE%" == "UNKNOWN-UN-KN" (
+    echo WARNING: Date components could not be fully determined. Using generic date. >> "%LOG_DIR%_error.log"
+    set "CURRENT_DATE=NODATE_%RANDOM%"
+)
 
 :: --- Define Log File Path ---
 set "LOG_FILE=%LOG_DIR%DebugPushover_%CURRENT_DATE%.txt"
@@ -63,8 +88,6 @@ echo. >> "%LOG_FILE%"
 
 :: --- Execute the cURL Command and Redirect All Output to Log File ---
 echo INFO: Attempting to send Pushover notification via cURL... >> "%LOG_FILE%"
-:: Redirect both standard output (1) and standard error (2) to the log file.
-:: The cURL command's response (success/error from Pushover API) will be captured.
 curl -s ^
   --form-string "token=%PUSHOVER_API_TOKEN%" ^
   --form-string "user=%PUSHOVER_USER_KEY%" ^
